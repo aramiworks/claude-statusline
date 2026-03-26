@@ -44,7 +44,7 @@ eval "$(echo "$input" | jq -r '
 
 # Shorten cwd: replace $HOME with ~
 home_dir="$HOME"
-short_dir="${cwd/#$home_dir/\~}"
+short_dir=$(echo "$cwd" | sed "s|^$home_dir|~|")
 
 # Compact model name: "Claude Opus 4.6 (1M context)" → "opus"
 model=$(echo "$model_full" | sed 's/^Claude //' | sed 's/ [0-9].*//' | tr '[:upper:]' '[:lower:]')

@@ -1,0 +1,27 @@
+# claude-statusline configuration
+# Copy to ~/.claude/statusline.conf and edit as needed.
+# All values shown are defaults — only uncomment what you want to change.
+
+# --- Feature toggles ---
+# SHOW_GIT=true              # Git branch, worktree badge
+# SHOW_RATE_LIMITS=true      # 5-hour and 7-day rate limit gauges
+# SHOW_CACHE=true            # Cache hit percentage
+# SHOW_DURATION=true         # Session duration
+# SHOW_ISSUE_ID=true         # Extract issue ID from branch (Linear, Jira, etc.)
+# SHOW_TMUX_TASK=true        # Task summary from tmux pane title
+
+# --- Color thresholds ---
+# Context usage: green → yellow → red
+# CONTEXT_WARN_PCT=70        # Yellow at 70%
+# CONTEXT_CRIT_PCT=90        # Red at 90%
+
+# Session cost (in cents): green → yellow → red
+# COST_WARN_CENTS=50         # Yellow at $0.50
+# COST_CRIT_CENTS=200        # Red at $2.00
+
+# Rate limits: green → yellow → red
+# RATE_WARN_PCT=60           # Yellow at 60%
+# RATE_CRIT_PCT=85           # Red at 85%
+
+# --- Performance ---
+# GIT_CACHE_TTL=5            # Seconds to cache git branch (0 = no cache)

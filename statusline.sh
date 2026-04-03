@@ -241,7 +241,7 @@ if [ -n "$cost" ]; then
   fi
   c=$(color_by_pct "$((cost_millis / 10))" "$COST_WARN_CENTS" "$COST_CRIT_CENTS")
   if [ -n "$daily_fmt" ]; then
-    printf "%b\033[%sm(%s/%s)\033[0m" "$SEP" "$c" "$cost_fmt" "$daily_fmt"
+    printf "%b\033[%sm%s/%s\033[0m" "$SEP" "$c" "$cost_fmt" "$daily_fmt"
   else
     printf "%b\033[%sm%s\033[0m" "$SEP" "$c" "$cost_fmt"
   fi

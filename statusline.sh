@@ -213,16 +213,19 @@ elif [ -n "$used_pct" ]; then
   printf "%b\033[%sm%s%% ctx\033[0m" "$SEP" "$c" "$used_int"
 fi
 
-# COST — session cost, or (session/daily) when SPEND_LOG is configured
-daily_fmt=""
+# COST — session cost; when SPEND_LOG set: {session} {agent_today}/{total_today}
+# agent_today = spend.jsonl today; total_today = agent_today + session
+agent_today_raw=""
+agent_today_fmt=""
+total_today_fmt=""
 if [ -n "$SPEND_LOG" ] && [ -f "$SPEND_LOG" ]; then
   today=$(date +%Y-%m-%d)
-  daily_total=$(jq -r --arg today "$today" 'select(.ts | startswith($today)) | .cost' "$SPEND_LOG" 2>/dev/null | awk '{s+=$1} END {if (NR>0) printf "%.4f", s; else print ""}')
-  if [ -n "$daily_total" ]; then
-    dt_whole="${daily_total%%.*}"
-    dt_frac="${daily_total#*.}"
-    dt_frac2=$(printf "%.2s" "${dt_frac}00")
-    daily_fmt=$(printf "\$%s.%s" "$dt_whole" "$dt_frac2")
+  agent_today_raw=$(jq -r --arg today "$today" 'select(.ts | startswith($today)) | .cost' "$SPEND_LOG" 2>/dev/null | awk '{s+=$1} END {if (NR>0) printf "%.4f", s; else print ""}')
+  if [ -n "$agent_today_raw" ]; then
+    at_whole="${agent_today_raw%%.*}"
+    at_frac="${agent_today_raw#*.}"
+    at_frac2=$(printf "%.2s" "${at_frac}00")
+    agent_today_fmt=$(printf "\$%s.%s" "$at_whole" "$at_frac2")
   fi
 fi
 
@@ -240,8 +243,14 @@ if [ -n "$cost" ]; then
     cost_fmt=$(printf "\$%s.%s" "$cost_whole" "$cost_frac2")
   fi
   c=$(color_by_pct "$((cost_millis / 10))" "$COST_WARN_CENTS" "$COST_CRIT_CENTS")
-  if [ -n "$daily_fmt" ]; then
-    printf "%b\033[%sm%s/%s\033[0m" "$SEP" "$c" "$cost_fmt" "$daily_fmt"
+
+  if [ -n "$agent_today_fmt" ]; then
+    total=$(awk "BEGIN {printf \"%.4f\", $cost + ${agent_today_raw:-0}}")
+    tt_whole="${total%%.*}"
+    tt_frac="${total#*.}"
+    tt_frac2=$(printf "%.2s" "${tt_frac}00")
+    total_today_fmt=$(printf "\$%s.%s" "$tt_whole" "$tt_frac2")
+    printf "%b\033[%sm%s %s/%s\033[0m" "$SEP" "$c" "$cost_fmt" "$agent_today_fmt" "$total_today_fmt"
   else
     printf "%b\033[%sm%s\033[0m" "$SEP" "$c" "$cost_fmt"
   fi

@@ -61,6 +61,7 @@ cache_key=$(printf '%s' "$cwd" | cksum | cut -d' ' -f1)
 CACHE_FILE="/tmp/.claude-statusline-git-${cache_key}"
 git_branch=""
 is_worktree=""
+linked_worktrees=""
 
 if [ "$SHOW_GIT" = "true" ] && [ -n "$cwd" ]; then
   cache_valid=""
@@ -77,6 +78,7 @@ if [ "$SHOW_GIT" = "true" ] && [ -n "$cwd" ]; then
     git_branch=$(sed -n '1p' "${CACHE_FILE}" 2>/dev/null)
     is_worktree=$(sed -n '2p' "${CACHE_FILE}" 2>/dev/null)
     git_common=$(sed -n '3p' "${CACHE_FILE}" 2>/dev/null)
+    linked_worktrees=$(sed -n '4p' "${CACHE_FILE}" 2>/dev/null)
     [ "$is_worktree" = "$git_branch" ] && is_worktree=""
   else
     git_info=$(git -C "$cwd" --no-optional-locks rev-parse --abbrev-ref HEAD --git-dir --git-common-dir 2>/dev/null)
@@ -88,7 +90,33 @@ if [ "$SHOW_GIT" = "true" ] && [ -n "$cwd" ]; then
         is_worktree=$(basename "$cwd")
       fi
     fi
-    printf "%s\n%s\n%s\n" "$git_branch" "$is_worktree" "$git_common" > "${CACHE_FILE}" 2>/dev/null
+    # Enumerate linked worktrees when on the main worktree — show active issue IDs
+    # Shows up to 3 issue IDs sorted by worktree mtime (most recent first), then +N for overflow
+    if [ -z "$is_worktree" ] && [ -n "$git_branch" ]; then
+      wt_raw=$(git -C "$cwd" --no-optional-locks worktree list --porcelain 2>/dev/null)
+      all_ids=$(printf '%s\n\n' "$wt_raw" | awk -v main="$git_branch" -v cwd="$cwd" '
+        /^worktree / { wt=$2 }
+        /^branch / { br=$2; gsub(/^refs\/heads\//, "", br) }
+        /^$/ { if (br != "" && br != main && wt != cwd) {
+          if (match(br, /[A-Z]+-[0-9]+/)) print wt, substr(br, RSTART, RLENGTH)
+        }; wt=""; br="" }
+      ')
+      if [ -n "$all_ids" ]; then
+        sorted_ids=$(printf '%s\n' "$all_ids" | while IFS=' ' read -r wt_path issue_id; do
+          mtime=$(stat -f %m "$wt_path" 2>/dev/null || stat -c %Y "$wt_path" 2>/dev/null || echo 0)
+          printf '%s %s\n' "$mtime" "$issue_id"
+        done | sort -rn | awk '{print $2}')
+        total=$(printf '%s\n' "$sorted_ids" | wc -l | tr -d ' ')
+        top3=$(printf '%s\n' "$sorted_ids" | head -3 | tr '\n' ' ' | sed 's/ $//')
+        if [ "$total" -gt 3 ]; then
+          overflow=$(( total - 3 ))
+          linked_worktrees="${top3} +${overflow}"
+        else
+          linked_worktrees="$top3"
+        fi
+      fi
+    fi
+    printf "%s\n%s\n%s\n%s\n" "$git_branch" "$is_worktree" "$git_common" "$linked_worktrees" > "${CACHE_FILE}" 2>/dev/null
   fi
 fi
 
@@ -170,6 +198,9 @@ if [ -n "$git_branch" ]; then
     printf "\033[36m[%s] \033[0m" "$wt_label"
   fi
   printf "\033[35m%s\033[0m" "$git_branch"
+  if [ -n "$linked_worktrees" ]; then
+    printf " \033[36m[+%s]\033[0m" "$linked_worktrees"
+  fi
 fi
 
 # APPLIED PATCH badge (yellow — shows when a worktree patch is applied to main)

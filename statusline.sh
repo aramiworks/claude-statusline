@@ -23,6 +23,7 @@ COST_CRIT_CENTS=200
 RATE_WARN_PCT=60
 RATE_CRIT_PCT=85
 GIT_CACHE_TTL=5
+SPEND_LOG=""
 # shellcheck disable=SC1090
 [ -f "$STATUSLINE_CONF" ] && . "$STATUSLINE_CONF"
 
@@ -212,7 +213,19 @@ elif [ -n "$used_pct" ]; then
   printf "%b\033[%sm%s%% ctx\033[0m" "$SEP" "$c" "$used_int"
 fi
 
-# COST (color thresholds in cents via config)
+# COST — session cost, or (session/daily) when SPEND_LOG is configured
+daily_fmt=""
+if [ -n "$SPEND_LOG" ] && [ -f "$SPEND_LOG" ]; then
+  today=$(date +%Y-%m-%d)
+  daily_total=$(jq -r --arg today "$today" 'select(.ts | startswith($today)) | .cost' "$SPEND_LOG" 2>/dev/null | awk '{s+=$1} END {if (NR>0) printf "%.4f", s; else print ""}')
+  if [ -n "$daily_total" ]; then
+    dt_whole="${daily_total%%.*}"
+    dt_frac="${daily_total#*.}"
+    dt_frac2=$(printf "%.2s" "${dt_frac}00")
+    daily_fmt=$(printf "\$%s.%s" "$dt_whole" "$dt_frac2")
+  fi
+fi
+
 if [ -n "$cost" ]; then
   cost_whole="${cost%%.*}"
   cost_frac="${cost#*.}"
@@ -227,7 +240,11 @@ if [ -n "$cost" ]; then
     cost_fmt=$(printf "\$%s.%s" "$cost_whole" "$cost_frac2")
   fi
   c=$(color_by_pct "$((cost_millis / 10))" "$COST_WARN_CENTS" "$COST_CRIT_CENTS")
-  printf "%b\033[%sm%s\033[0m" "$SEP" "$c" "$cost_fmt"
+  if [ -n "$daily_fmt" ]; then
+    printf "%b\033[%sm(%s/%s)\033[0m" "$SEP" "$c" "$cost_fmt" "$daily_fmt"
+  else
+    printf "%b\033[%sm%s\033[0m" "$SEP" "$c" "$cost_fmt"
+  fi
 fi
 
 # RATE LIMITS (5h:X% 7d:Y%)
